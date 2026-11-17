@@ -1,0 +1,29 @@
+{
+  "name": "ארנק מתנות וזיכויים",
+  "short_name": "ארנק מתנות",
+  "description": "כל כרטיסי המתנה, הזיכויים והשוברים של הבית במקום אחד.",
+  "lang": "he",
+  "dir": "rtl",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f3f9",
+  "theme_color": "#5b45e0",
+  "categories": ["finance", "lifestyle", "shopping"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "הוספת כרטיס", "short_name": "הוספה", "url": "./#/add", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "היסטוריה", "url": "./#/history", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  }
+}

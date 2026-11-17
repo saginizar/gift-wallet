@@ -1,0 +1,47 @@
+# ─── Dependencies ────────────────────────────────────────────
+node_modules/
+package-lock.json
+
+# ─── Build outputs ───────────────────────────────────────────
+dist/
+build/
+out/
+
+# ─── Secrets — NEVER commit real values ──────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+.clasprc.json
+
+# ─── Local databases ─────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# ─── Logs ────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ─── OS / IDE ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/settings.json
+*.swp
+
+# ─── Generated outputs / reports (tests/ is source here and is committed) ──
+outputs/*
+!outputs/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# ─── Misc ────────────────────────────────────────────────────
+playwright-report/
+test-results/
+coverage/

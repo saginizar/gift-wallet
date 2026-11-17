@@ -1,0 +1,18 @@
+{
+  "name": "gift-wallet",
+  "version": "1.0.0",
+  "description": "ארנק מתנות וזיכויים: gift cards, store credits and vouchers for the household, as an offline-first PWA with optional end-to-end encrypted sync through Google Apps Script.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "dev": "node scripts/serve.mjs --mock-backend",
+    "stamp": "node scripts/stamp-sw.mjs",
+    "pretest": "node scripts/stamp-sw.mjs",
+    "test": "node --test --test-concurrency=1 \"tests/*.test.mjs\"",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
