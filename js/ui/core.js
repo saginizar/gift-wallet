@@ -38,19 +38,27 @@ export function parseHash(hash = location.hash) {
   }
 }
 
+// Each history entry carries a visit id, so opening "add" again (even on the same address)
+// starts a fresh form. A sheet's entry copies the id of the screen under it: opening and
+// closing a sheet is not a new visit, and the form under it keeps what was typed.
 const routeListeners = new Set();
-let visit = 0;
-const emitRoute = () => {
-  visit++;
-  routeListeners.forEach((fn) => fn());
-};
+let visitSeq = 0;
+function currentVisit() {
+  let v = history.state?.gwVisit;
+  if (!v) {
+    v = `${Date.now().toString(36)}.${++visitSeq}`;
+    history.replaceState({ ...(history.state || {}), gwVisit: v }, '');
+  }
+  return v;
+}
+const emitRoute = () => routeListeners.forEach((fn) => fn());
 window.addEventListener('hashchange', emitRoute);
 window.addEventListener('popstate', emitRoute);
 
 export function useRoute() {
-  const [route, setRoute] = useState(() => ({ ...parseHash(), visit }));
+  const [route, setRoute] = useState(() => ({ ...parseHash(), visit: currentVisit() }));
   useEffect(() => {
-    const on = () => setRoute({ ...parseHash(), visit });
+    const on = () => setRoute({ ...parseHash(), visit: currentVisit() });
     routeListeners.add(on);
     return () => routeListeners.delete(on);
   }, []);

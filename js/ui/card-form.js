@@ -9,7 +9,8 @@ import { suggestStores, findStore, PALETTE } from '../lib/catalog.js';
 import { parseAmount, amountInputValue, CURRENCIES } from '../lib/money.js';
 import { todayISO, addYears, formatDate, isISODate, daysBetween, expiryLabel } from '../lib/dates.js';
 import { compressImage, canDetectBarcodes, detectInImage } from '../lib/image.js';
-import { pickFile, readClipboard } from '../lib/platform.js';
+import { readClipboard } from '../lib/platform.js';
+import { pickPhoto } from './photos.js';
 import { takePrefill } from './paste.js';
 import { openScanner } from './scanner.js';
 
@@ -97,7 +98,7 @@ export function CardForm({ id }) {
   }
 
   async function addPhoto() {
-    const file = await pickFile('image/*');
+    const file = await pickPhoto();
     if (!file) return;
     try {
       const img = await compressImage(file);

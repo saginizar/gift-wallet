@@ -6,12 +6,13 @@ import { html, useState, useEffect, useRef } from '../vendor/preact-htm.js';
 import { navigate, toastError } from './core.js';
 import { Icon, Field, Banner, openSheet } from './components.js';
 import { parseGiftText } from '../lib/parse-text.js';
-import { readClipboard, pickFile } from '../lib/platform.js';
+import { readClipboard, pickFile, canUseCamera } from '../lib/platform.js';
 import { formatMoney } from '../lib/money.js';
 import { formatDate } from '../lib/dates.js';
 import { TYPES } from '../lib/model.js';
 import { compressImage } from '../lib/image.js';
 import { ocrSupported, recognizeImage } from '../lib/ocr.js';
+import { PhotoSourceButtons } from './photos.js';
 
 // Hand-off to the add form without putting codes into the URL or browser history. The
 // form takes it when it opens; it is never kept for a later form.
@@ -49,9 +50,11 @@ function PasteBody({ close, startWithScan = false }) {
   const started = useRef(false);
 
   useEffect(() => {
-    if (startWithScan && !started.current) {
+    // On a phone the user picks camera or gallery in the sheet; a computer has only the
+    // file dialog, so it opens straight away.
+    if (startWithScan && !canUseCamera() && !started.current) {
       started.current = true;
-      scanImage();
+      scanImage(false);
     } else if (!startWithScan) {
       const t = setTimeout(() => ref.current?.focus(), 250);
       return () => clearTimeout(t);
@@ -69,8 +72,8 @@ function PasteBody({ close, startWithScan = false }) {
     else ref.current?.focus();
   }
 
-  async function scanImage() {
-    const file = await pickFile('image/*');
+  async function scanImage(camera) {
+    const file = await pickFile('image/*', { camera });
     if (!file) return;
     const preview = URL.createObjectURL(file);
     setScan({ preview, progress: 0, label: 'מכין' });
@@ -96,9 +99,7 @@ function PasteBody({ close, startWithScan = false }) {
   const scanning = scan && !scan.done;
   return html`<div class="form">
     ${!scan && html`<p class="muted">מצלמים קבלה או תעודת זיכוי, מעלים צילום מסך של SMS או מייל, או מדביקים את הטקסט. אנחנו נמלא את הפרטים, ובסוף בודקים ומאשרים.</p>`}
-    ${ocrSupported() && !scanning && html`<button type="button" class=${`btn block ${scan ? 'outline' : 'primary'}`} onClick=${scanImage}>
-      <${Icon} name="camera" />${scan ? 'תמונה אחרת' : 'צילום או צילום מסך'}
-    </button>`}
+    ${ocrSupported() && !scanning && html`<${PhotoSourceButtons} onPick=${scanImage} primary=${!scan} />`}
     ${scanning && html`<${ScanProgress} ...${scan} />`}
     ${scan?.done && !scan.error && html`<${Banner} icon="sparkles" title="קראנו את הטקסט מהתמונה">
       התמונה תישמר בכרטיס. אפשר לתקן את הטקסט למטה אם משהו נקרא לא נכון.

@@ -3,6 +3,9 @@
 
 export const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 export const isAndroid = () => /android/i.test(navigator.userAgent);
+// Phones and tablets, where a file input with `capture` opens the camera (desktop browsers
+// ignore it and show the file dialog).
+export const canUseCamera = () => isIOS() || isAndroid() || !!window.matchMedia?.('(pointer: coarse)').matches;
 export const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
 
 export async function copyText(text) {
@@ -73,12 +76,14 @@ export async function shareOrDownload(name, content, type) {
   return 'downloaded';
 }
 
-// Some iOS versions fire `change` only for inputs that are in the document.
-export function pickFile(accept) {
+// Some iOS versions fire `change` only for inputs that are in the document. `camera` opens
+// the back camera instead of the gallery. Must be called inside the tap that asks for it.
+export function pickFile(accept, { camera = false } = {}) {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = accept;
+    if (camera) input.setAttribute('capture', 'environment');
     input.style.display = 'none';
     const done = (file) => {
       input.remove();
@@ -157,7 +162,11 @@ export function registerServiceWorker(onUpdate) {
         if (worker.state === 'installed') notify(worker);
       });
     });
+    // An installed app is usually resumed, not reopened: check whenever it comes back too.
     setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
   }).catch(() => {});
   let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {

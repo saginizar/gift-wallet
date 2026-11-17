@@ -3,9 +3,9 @@
 
 import { html, useEffect, useState } from '../vendor/preact-htm.js';
 import { ctx, openOverlay, toast, toastError } from './core.js';
-import { Icon, confirmDialog } from './components.js';
+import { Icon, confirmDialog, openSheet } from './components.js';
 import { compressImage, detectInImage } from '../lib/image.js';
-import { pickFile } from '../lib/platform.js';
+import { pickFile, canUseCamera, isIOS } from '../lib/platform.js';
 import { ocrSupported, recognizeImage } from '../lib/ocr.js';
 import { parseGiftText } from '../lib/parse-text.js';
 import { formatMoney } from '../lib/money.js';
@@ -57,6 +57,32 @@ export async function openPhotoViewer(cardId, photoId, { canDelete = true } = {}
   }
 }
 
+// "Take a photo" / "from the gallery". On a computer there is only the file dialog.
+export function PhotoSourceButtons({ onPick, primary = true }) {
+  const main = `btn ${primary ? 'primary' : 'outline'}`;
+  if (!canUseCamera()) {
+    return html`<button type="button" class=${`${main} block`} onClick=${() => onPick(false)}><${Icon} name="image" />בחירת תמונה</button>`;
+  }
+  return html`<div class="btn-row">
+    <button type="button" class=${main} onClick=${() => onPick(true)}><${Icon} name="camera" />צילום</button>
+    <button type="button" class="btn outline" onClick=${() => onPick(false)}><${Icon} name="image" />מהגלריה</button>
+  </div>`;
+}
+
+function PhotoSourceBody({ close }) {
+  // The picker opens inside the tap (iOS requires that); the sheet closes once a photo is
+  // chosen, and stays open if the camera or gallery was cancelled.
+  const pick = (camera) => pickFile('image/*', { camera }).then((file) => file && close(file));
+  return html`<div class="form"><${PhotoSourceButtons} onPick=${pick} /></div>`;
+}
+
+// Android's picker for images shows only the gallery, so phones get an explicit choice.
+// iOS's own menu already offers the camera, and a computer has only files.
+export async function pickPhoto() {
+  if (!canUseCamera() || isIOS()) return pickFile('image/*');
+  return (await openSheet('הוספת תמונה', PhotoSourceBody)) || null;
+}
+
 const FILL_LABELS = {
   initialAmount: 'סכום', expiry: 'תוקף', code: 'קוד', pin: 'קוד סודי', link: 'קישור', discount: 'הטבה',
 };
@@ -76,7 +102,7 @@ function missingDetails(card, parsed) {
 // Picks a photo, stores it on the card, then reads it: a detected barcode, or text with
 // details the card is missing, is offered to the user before anything is changed.
 export async function addPhotoFlow(cardId) {
-  const file = await pickFile('image/*');
+  const file = await pickPhoto();
   if (!file) return;
   try {
     const img = await compressImage(file);

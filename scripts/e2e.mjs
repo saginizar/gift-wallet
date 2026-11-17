@@ -185,8 +185,9 @@ try {
   const FIXTURES = fileURLToPath(new URL('../tests/fixtures/ocr/', import.meta.url));
   const scan = async (file) => {
     await a.goto(`${A_URL}#/`);
-    const chooser = a.waitForEvent('filechooser');
     await a.getByRole('button', { name: 'סריקת קבלה או צילום מסך' }).first().click();
+    const chooser = a.waitForEvent('filechooser');
+    await a.getByRole('button', { name: 'מהגלריה' }).click();
     await (await chooser).setFiles(FIXTURES + file);
     await a.getByText('קראנו את הטקסט מהתמונה').waitFor({ timeout: 90000 });
     await a.getByRole('button', { name: /המשך למילוי/ }).click();
@@ -199,6 +200,29 @@ try {
       type: await a.locator('.segmented button.active').first().innerText(),
     };
   };
+
+  await step('phone offers camera and gallery; the camera button opens the camera', async () => {
+    await a.goto(`${A_URL}#/`);
+    await a.getByRole('button', { name: 'סריקת קבלה או צילום מסך' }).first().click();
+    let chooser = a.waitForEvent('filechooser');
+    await a.getByRole('button', { name: 'צילום', exact: true }).click();
+    assert.equal(await (await chooser).element().getAttribute('capture'), 'environment');
+    chooser = a.waitForEvent('filechooser');
+    await a.getByRole('button', { name: 'מהגלריה' }).click();
+    assert.equal(await (await chooser).element().getAttribute('capture'), null);
+    await shot(a, '08a-scan-source');
+  });
+
+  await step('closing a sheet on the add form keeps what was typed', async () => {
+    await a.goto(`${A_URL}#/`);
+    await a.getByRole('button', { name: 'הוספת כרטיס' }).click();
+    await a.locator('#f-store').fill('בדיקת שמירה');
+    await a.getByRole('button', { name: 'הוספת תמונה' }).click();
+    await a.getByRole('button', { name: 'מהגלריה' }).waitFor();
+    await a.goBack();
+    await a.getByRole('button', { name: 'מהגלריה' }).waitFor({ state: 'detached' });
+    assert.equal(await a.locator('#f-store').inputValue(), 'בדיקת שמירה');
+  });
 
   await step('scan a photo of a credit-note receipt', async () => {
     const f = await scan('receipt-photo.png');
@@ -341,8 +365,9 @@ try {
 
   await step('photo syncs to the other phone', async () => {
     await openCard(a, 'BuyMe');
-    const chooser = a.waitForEvent('filechooser');
     await a.locator('.photos .photo-thumb.add').click();
+    const chooser = a.waitForEvent('filechooser');
+    await a.getByRole('button', { name: 'מהגלריה' }).click();
     await (await chooser).setFiles(fileURLToPath(new URL('../icons/icon-512.png', import.meta.url)));
     await a.locator('.photos img').waitFor();
     await flush(a);
