@@ -1,0 +1,5 @@
+# Vendored engine and models: keep byte-for-byte (no line-ending conversion).
+ocr/** binary
+js/vendor/** -text
+*.png binary
+*.woff2 binary

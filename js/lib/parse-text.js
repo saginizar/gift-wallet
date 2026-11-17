@@ -122,22 +122,49 @@ function storeMentioned(name, original, norm) {
   return new RegExp(`(^|[^א-ת])[בלמוהשכ]?${escapeRe(n)}([^א-ת]|$)`).test(norm);
 }
 
+// Names that are places, not who issued the card: "קניון עזריאלי" on a Fox receipt is
+// the branch, not an Azrieli gift card.
+const PLACE_BEFORE = /(?:קניון|סניף|מרכז|מתחם|ביג|kanyon|mall)\s*$/i;
+
+// The store mentioned earliest wins (a receipt or email starts with who issued it), then
+// the longer, more specific name.
 function findStore(text) {
-  const norm = normalizeText(text);
   let best = null;
   for (const s of STORES) {
     for (const name of [s.name, ...s.aliases]) {
-      const len = normalizeText(name).length;
-      if ((!best || len > best.len) && storeMentioned(name, text, norm)) best = { name: s.name, len };
+      const n = normalizeText(name);
+      if (!storeMentioned(name, text, normalizeText(text))) continue;
+      const at = firstMention(name, n, text);
+      if (at < 0) continue;
+      if (best && (at > best.at || (at === best.at && n.length <= best.len))) continue;
+      best = { name: s.name, at, len: n.length };
     }
   }
   return best?.name || '';
 }
 
+// Position of the first mention that is not a place name ("קניון עזריאלי"), or -1.
+function firstMention(name, n, text) {
+  const lower = text.toLowerCase();
+  const needles = [name.toLowerCase(), n].filter(Boolean);
+  let first = -1;
+  for (const needle of needles) {
+    let i = lower.indexOf(needle);
+    while (i >= 0) {
+      if (!PLACE_BEFORE.test(lower.slice(Math.max(0, i - 12), i))) {
+        if (first < 0 || i < first) first = i;
+        break;
+      }
+      i = lower.indexOf(needle, i + 1);
+    }
+  }
+  return first;
+}
+
 function findType(text, store) {
   if (/זיכוי|תעודת זיכוי|credit note|store credit/i.test(text)) return 'credit';
   if (/קופון|coupon|promo code|קוד הנחה|\d+%\s*הנחה/i.test(text)) return 'coupon';
-  if (/גיפט|gift ?card|כרטיס מתנה|כרטיס נטען|תו קני|תו שי/i.test(text)) return 'giftcard';
+  if (/גיפט|gift ?card|כרטיס ה?מתנה|כרטיסי ה?מתנה|כרטיס נטען|תו קני|תו שי/i.test(text)) return 'giftcard';
   if (/שובר|voucher/i.test(text)) return store === 'BuyMe' ? 'giftcard' : 'voucher';
   const entry = STORES.find((s) => s.name === store);
   return entry?.kind || '';

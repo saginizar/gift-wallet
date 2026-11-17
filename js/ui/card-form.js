@@ -55,7 +55,9 @@ export function CardForm({ id }) {
   const [typeTouched, setTypeTouched] = useState(!!editing || !!prefill?.type);
   const [barcodeTouched, setBarcodeTouched] = useState(!!editing);
   const [storeFocus, setStoreFocus] = useState(false);
-  const [photos, setPhotos] = useState([]);
+  const [photos, setPhotos] = useState(() => (prefill?.photo
+    ? [{ ...prefill.photo, url: URL.createObjectURL(new Blob([prefill.photo.bytes], { type: prefill.photo.mime })) }]
+    : []));
   const [busy, setBusy] = useState(false);
   const formRef = useRef();
   const { members, cards } = store.snapshot();
@@ -156,14 +158,15 @@ export function CardForm({ id }) {
   }
 
   const typeOptions = TYPE_ORDER.map((t) => ({ value: t, label: TYPES[t].label, icon: TYPE_ICONS[t] }));
-  const prefilled = prefill?.found?.filter((k) => k !== 'found') || [];
+  const prefilled = prefill?.found?.filter((k) => k !== 'found' && k !== 'photo') || [];
 
   return html`<div>
     <${TopBar} title=${editing ? 'עריכת פרטים' : 'הוספה לארנק'} back=${() => goBack()} />
     <main class="screen no-tabs">
       <form class="form" ref=${formRef} onSubmit=${save} novalidate>
-        ${prefill && html`<${Banner} icon="sparkles" title=${prefilled.length ? 'מילאנו מתוך ההודעה' : 'לא מצאנו פרטים בהודעה'}>
-          ${prefilled.length ? 'כדאי לעבור על השדות ולוודא שהכול נכון.' : 'אפשר למלא ידנית. ההודעה נשמרה בהערות.'}
+        ${prefill && html`<${Banner} icon="sparkles" title=${prefilled.length ? (prefill.photo ? 'מילאנו מתוך התמונה' : 'מילאנו מתוך ההודעה') : 'לא מצאנו פרטים'}>
+          ${prefilled.length ? 'כדאי לעבור על השדות ולוודא שהכול נכון.' : 'אפשר למלא ידנית. הטקסט נשמר בהערות.'}
+          ${prefill.photo ? ' התמונה תישמר בכרטיס.' : ''}
         </${Banner}>`}
 
         <${Segmented} label="סוג" options=${typeOptions} value=${form.type} onChange=${(t) => { setTypeTouched(true); set({ type: t }); }} />

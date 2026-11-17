@@ -66,3 +66,23 @@ test('common English words do not become stores', () => {
 test('empty input', () => {
   assert.deepEqual(parseGiftText('   ').found, []);
 });
+
+// Text as the OCR returns it from the fixtures in tests/fixtures/ocr (one line per row).
+test('OCR text of a credit-note receipt: the issuer wins over the mall it sits in', () => {
+  const r = parseGiftText('FOX\nפוקס סניף קניון עזריאלי\nתעודת זיכוי\nמספר זיכוי: 4471209931\nתאריך הנפקה: 02/11/2026\nסכום הזיכוי: 189.90 ₪\nבתוקף עד: 02/11/2028\nניתן לממש בכל סניפי פוקס\nקופה 3 קופאי 117', { today: '2026-11-17' });
+  assert.equal(r.store, 'Fox');
+  assert.equal(r.type, 'credit');
+  assert.equal(r.initialAmount, 189.9);
+  assert.equal(r.code, '4471209931');
+  assert.equal(r.expiry, '2028-11-02');
+});
+
+test('OCR text of a gift-card email with the definite article ("כרטיס המתנה")', () => {
+  const r = parseGiftText('כרטיס המתנה שלך משופרסל\nשופרסל <noreply@shufersal.co.il>\nמספר כרטיס: 6009 1234 5678 9012\nקוד סודי: 5530\nיתרה: 500 ש"ח\nהכרטיס בתוקף עד 31/12/2030\nשירות לקוחות 1-800-60-70-80', { today: '2026-11-17' });
+  assert.equal(r.store, 'שופרסל');
+  assert.equal(r.type, 'giftcard');
+  assert.equal(r.code, '6009 1234 5678 9012');
+  assert.equal(r.pin, '5530');
+  assert.equal(r.initialAmount, 500);
+  assert.equal(r.expiry, '2030-12-31');
+});

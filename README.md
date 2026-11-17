@@ -1,6 +1,6 @@
 # Gift Wallet (ארנק מתנות)
 
-A Hebrew, mobile-first app for keeping track of the household's gift cards (BuyMe, Tav Hazahav and the like), store credits, vouchers and coupons: balance, expiry date, code and barcode, with a shared history of who used what. It installs on the phone's home screen, works offline at the register, and can sync between phones through a Google Sheet in your own account, end-to-end encrypted.
+A Hebrew, mobile-first app for keeping track of the household's gift cards (BuyMe, Tav Hazahav and the like), store credits, vouchers and coupons: balance, expiry date, code and barcode, with a shared history of who used what. A photo of a credit-note receipt or a screenshot of an SMS or email fills in the details by itself (on-device text recognition). It installs on the phone's home screen, works offline at the register, and can sync between phones through a Google Sheet in your own account, end-to-end encrypted.
 
 ## Recovery — fresh machine setup
 
@@ -82,18 +82,24 @@ js/lib/                                   Logic, no DOM; unit tested in Node
   sync.js         push/pull protocol, pairing codes, photo and reminder upload
   crypto.js       HKDF + AES-GCM (WebCrypto)
   parse-text.js   pulls amount/code/expiry/store out of a pasted SMS or email
+  ocr.js          on-device text recognition (Tesseract.js), loaded on first scan
+  ocr-text.js     rebuilds OCR lines in reading order (Hebrew mixed with numbers)
   code128.js      Code 128 barcode encoder (checked against JsBarcode fixtures)
   reminders.js    .ics export, Google Calendar links, reminder summary
   backup.js       JSON backup/restore, CSV export
   catalog.js      Israeli stores with Hebrew/English spellings
 js/ui/                                    Preact + htm components, one file per screen
-js/vendor/                                Preact+htm standalone, qrcode-generator (MIT)
+js/vendor/                                Preact+htm standalone, qrcode-generator (MIT),
+                                          tesseract/ (Tesseract.js 7, Apache-2.0)
+ocr/                                      Tesseract engine (WebAssembly) + Hebrew/English models
+tests/fixtures/ocr/                       Receipt photo, SMS and email screenshots for OCR tests
 backend/Code.gs                           Google Apps Script sync backend
 scripts/serve.mjs                         Local static server (+ --mock-backend)
 scripts/mock-gas.mjs                      Apps Script emulator that runs Code.gs unchanged
 scripts/stamp-sw.mjs                      Writes the precache list + version into sw.js
 scripts/e2e.mjs                           Browser end-to-end test (two phones)
 scripts/make-icons.mjs                    Renders icons/icon.svg to PNGs (needs @resvg/resvg-js)
+scripts/make-ocr-fixtures.mjs             Renders the OCR test images in a real browser
 tests/                                    node:test unit tests (source, committed)
 ```
 
@@ -106,4 +112,5 @@ tests/                                    node:test unit tests (source, committe
 - **Last write wins per record**, ordered by `(updatedAt, deviceId)`, with timestamps that never move backwards for a record (so a phone with a slow clock still wins with a newer edit). The backend refuses older versions and returns the current one.
 - **Email reminders are opt-in** because they need a plaintext summary on the sheet (store and title, balance, expiry, owner; never codes or PINs). The opt-in is a synced household setting, so whichever phone syncs keeps the list current. Without it, reminders come from the calendar (.ics / Google Calendar link per card or for all cards).
 - **Emptying the bin wins.** If one phone purges a card while the other restores or edits it, the purge is kept on both; purchases stay in the ledger (notes blanked) so a restore can never come back with a wrong balance.
+- **Text recognition runs on the phone** (Tesseract.js, English + Hebrew "best_int" models). The image never leaves the device and there is no API key or cost. The ~5 MB engine is fetched from this site (not a CDN) the first time someone scans and kept in its own cache, so app updates do not re-download it. Two passes: the whole image with English+Hebrew, then every number re-read alone with a digits-only model, because the Hebrew model tends to merge digits inside Hebrew lines ("189.90" read as "0"). Lines are rebuilt from word positions, since Tesseract's own order is unreliable when Hebrew and numbers mix.
 - **No build step.** Preact + htm as a vendored ES module keeps the deploy to "push the files", and the precache list is generated so offline updates stay correct.

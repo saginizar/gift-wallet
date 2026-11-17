@@ -6,6 +6,10 @@ import { ctx, openOverlay, toast, toastError } from './core.js';
 import { Icon, confirmDialog } from './components.js';
 import { compressImage, detectInImage } from '../lib/image.js';
 import { pickFile } from '../lib/platform.js';
+import { ocrSupported, recognizeImage } from '../lib/ocr.js';
+import { parseGiftText } from '../lib/parse-text.js';
+import { formatMoney } from '../lib/money.js';
+import { formatDate } from '../lib/dates.js';
 
 export function usePhotoUrl(id) {
   const [state, setState] = useState({ url: null, missing: false });
@@ -53,7 +57,24 @@ export async function openPhotoViewer(cardId, photoId, { canDelete = true } = {}
   }
 }
 
-// Picks a photo, stores it on the card and offers a detected barcode as the card code.
+const FILL_LABELS = {
+  initialAmount: 'סכום', expiry: 'תוקף', code: 'קוד', pin: 'קוד סודי', link: 'קישור', discount: 'הטבה',
+};
+
+// Details read from the photo that the card does not have yet. Existing values are never
+// overwritten: the user typed them, or already confirmed them.
+function missingDetails(card, parsed) {
+  const patch = {};
+  if (parsed.initialAmount != null && card.initialAmount == null) {
+    patch.initialAmount = parsed.initialAmount;
+    if (parsed.currency) patch.currency = parsed.currency;
+  }
+  for (const f of ['expiry', 'code', 'pin', 'link', 'discount']) if (parsed[f] && !card[f]) patch[f] = parsed[f];
+  return patch;
+}
+
+// Picks a photo, stores it on the card, then reads it: a detected barcode, or text with
+// details the card is missing, is offered to the user before anything is changed.
 export async function addPhotoFlow(cardId) {
   const file = await pickFile('image/*');
   if (!file) return;
@@ -62,11 +83,24 @@ export async function addPhotoFlow(cardId) {
     await ctx.store.addPhoto(cardId, img.bytes, img.mime);
     toast('התמונה נשמרה');
     const card = ctx.store.view(cardId)?.card;
-    if (card && !card.code) {
+    if (!card) return;
+    if (!card.code) {
       const found = await detectInImage(img.bytes);
       if (found && await confirmDialog({ title: 'מצאנו ברקוד בתמונה', text: `לשמור את ${found.value} כקוד של הכרטיס?`, confirmLabel: 'שמירה' })) {
         await ctx.store.updateCard(cardId, { code: found.value, barcode: found.value, barcodeType: found.format === 'qr_code' ? 'qr' : 'code128' });
       }
+    }
+    if (!ocrSupported()) return;
+    const { text } = await recognizeImage(file);
+    const current = ctx.store.view(cardId)?.card;
+    if (!current) return;
+    const patch = missingDetails(current, parseGiftText(text));
+    const keys = Object.keys(patch).filter((k) => FILL_LABELS[k]);
+    if (!keys.length) return;
+    const summary = keys.map((k) => `${FILL_LABELS[k]}: ${k === 'initialAmount' ? formatMoney(patch[k], patch.currency || current.currency) : k === 'expiry' ? formatDate(patch[k]) : k === 'pin' ? '••••' : patch[k]}`).join('\n');
+    if (await confirmDialog({ title: 'קראנו פרטים מהתמונה', text: `להוסיף לכרטיס?\n${summary}`, confirmLabel: 'הוספה' })) {
+      await ctx.store.updateCard(cardId, patch);
+      toast('הפרטים נוספו לכרטיס');
     }
   } catch (e) {
     toastError(e);

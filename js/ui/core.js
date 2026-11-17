@@ -39,14 +39,18 @@ export function parseHash(hash = location.hash) {
 }
 
 const routeListeners = new Set();
-const emitRoute = () => routeListeners.forEach((fn) => fn());
+let visit = 0;
+const emitRoute = () => {
+  visit++;
+  routeListeners.forEach((fn) => fn());
+};
 window.addEventListener('hashchange', emitRoute);
 window.addEventListener('popstate', emitRoute);
 
 export function useRoute() {
-  const [route, setRoute] = useState(() => parseHash());
+  const [route, setRoute] = useState(() => ({ ...parseHash(), visit }));
   useEffect(() => {
-    const on = () => setRoute(parseHash());
+    const on = () => setRoute({ ...parseHash(), visit });
     routeListeners.add(on);
     return () => routeListeners.delete(on);
   }, []);

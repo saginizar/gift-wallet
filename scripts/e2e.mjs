@@ -181,6 +181,42 @@ try {
     await a.waitForURL(/#\/card\//);
   });
 
+  // Text recognition on the browser-rendered fixtures (scripts/make-ocr-fixtures.mjs).
+  const FIXTURES = fileURLToPath(new URL('../tests/fixtures/ocr/', import.meta.url));
+  const scan = async (file) => {
+    await a.goto(`${A_URL}#/`);
+    const chooser = a.waitForEvent('filechooser');
+    await a.getByRole('button', { name: 'סריקת קבלה או צילום מסך' }).first().click();
+    await (await chooser).setFiles(FIXTURES + file);
+    await a.getByText('קראנו את הטקסט מהתמונה').waitFor({ timeout: 90000 });
+    await a.getByRole('button', { name: /המשך למילוי/ }).click();
+    await a.waitForURL(/#\/add/);
+    return {
+      store: await a.locator('#f-store').inputValue(),
+      amount: await a.locator('#f-amount').inputValue(),
+      expiry: await a.locator('#f-expiry').inputValue(),
+      code: await a.locator('#f-code').inputValue(),
+      type: await a.locator('.segmented button.active').first().innerText(),
+    };
+  };
+
+  await step('scan a photo of a credit-note receipt', async () => {
+    const f = await scan('receipt-photo.png');
+    assert.deepEqual(f, { store: 'Fox', amount: '189.90', expiry: '2028-11-02', code: '4471209931', type: 'זיכוי' });
+    assert.equal(await a.locator('.photos img').count(), 1, 'the scanned image is attached');
+    await shot(a, '08b-scanned-receipt');
+    // Not saved: the paste step below adds the same Fox credit.
+  });
+
+  await step('scan SMS and email screenshots', async () => {
+    for (const file of ['sms-light.png', 'sms-dark.png']) {
+      assert.deepEqual(await scan(file), { store: 'BuyMe', amount: '250', expiry: '2031-03-15', code: '8820 1145 6673', type: 'כרטיס מתנה' }, file);
+    }
+    assert.deepEqual(await scan('email.png'), { store: 'שופרסל', amount: '500', expiry: '2030-12-31', code: '6009 1234 5678 9012', type: 'כרטיס מתנה' });
+    // A PIN opens "more details" by itself, so the field is already visible.
+    assert.equal(await a.locator('#f-pin').inputValue(), '5530');
+  });
+
   await step('more cards: voucher, expired credit', async () => {
     await a.goto(`${A_URL}#/add`);
     await a.getByRole('radio', { name: 'שובר' }).click();

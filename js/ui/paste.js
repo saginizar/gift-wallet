@@ -1,16 +1,20 @@
-// "Paste a message" flow: the user pastes an SMS/email about a gift card, we pre-fill the
-// add form. Also receives text shared from other apps (Android share target).
+// "Fill from a message" flow: the user scans a photo or screenshot (receipt, credit note,
+// SMS, email) or pastes the text, and we pre-fill the add form. The scanned image is kept
+// and attached to the new card. Also receives text shared from other apps (Android).
 
 import { html, useState, useEffect, useRef } from '../vendor/preact-htm.js';
-import { navigate } from './core.js';
-import { Icon, Field, openSheet } from './components.js';
+import { navigate, toastError } from './core.js';
+import { Icon, Field, Banner, openSheet } from './components.js';
 import { parseGiftText } from '../lib/parse-text.js';
-import { readClipboard } from '../lib/platform.js';
+import { readClipboard, pickFile } from '../lib/platform.js';
 import { formatMoney } from '../lib/money.js';
 import { formatDate } from '../lib/dates.js';
 import { TYPES } from '../lib/model.js';
+import { compressImage } from '../lib/image.js';
+import { ocrSupported, recognizeImage } from '../lib/ocr.js';
 
-// Hand-off to the add form without putting codes into the URL or browser history.
+// Hand-off to the add form without putting codes into the URL or browser history. The
+// form takes it when it opens; it is never kept for a later form.
 let pending = null;
 export function setPrefill(data) { pending = data; }
 export function takePrefill() {
@@ -30,13 +34,32 @@ const FOUND_LABELS = {
   discount: (r) => `הטבה: ${r.discount}`,
 };
 
-function PasteBody({ close }) {
+function ScanProgress({ progress, label, preview }) {
+  return html`<div class="scan-progress" role="status" aria-live="polite">
+    ${preview && html`<img src=${preview} alt="" />`}
+    <div class="bar"><span style=${{ width: `${Math.round(progress * 100)}%` }}></span></div>
+    <div class="muted small">${label || 'קורא את הטקסט…'}</div>
+  </div>`;
+}
+
+function PasteBody({ close, startWithScan = false }) {
   const [text, setText] = useState('');
+  const [scan, setScan] = useState(null); // { preview, image, progress, label, done, error, ms }
   const ref = useRef();
+  const started = useRef(false);
+
   useEffect(() => {
-    const t = setTimeout(() => ref.current?.focus(), 250);
-    return () => clearTimeout(t);
+    if (startWithScan && !started.current) {
+      started.current = true;
+      scanImage();
+    } else if (!startWithScan) {
+      const t = setTimeout(() => ref.current?.focus(), 250);
+      return () => clearTimeout(t);
+    }
+    return undefined;
   }, []);
+  useEffect(() => () => scan?.preview && URL.revokeObjectURL(scan.preview), [scan?.preview]);
+
   const parsed = parseGiftText(text);
   const found = parsed.found.filter((k) => FOUND_LABELS[k]);
 
@@ -46,28 +69,58 @@ function PasteBody({ close }) {
     else ref.current?.focus();
   }
 
+  async function scanImage() {
+    const file = await pickFile('image/*');
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    setScan({ preview, progress: 0, label: 'מכין' });
+    try {
+      // The compressed copy is what gets attached to the card; OCR reads the original.
+      const [image, result] = await Promise.all([
+        compressImage(file),
+        recognizeImage(file, (progress, label) => setScan((s) => (s && !s.done ? { ...s, progress, label } : s))),
+      ]);
+      setText(result.text);
+      setScan((s) => ({ ...s, image, done: true, progress: 1, ms: result.ms, confidence: result.confidence }));
+    } catch (e) {
+      setScan((s) => ({ ...s, done: true, error: true }));
+      toastError(e);
+    }
+  }
+
   function proceed() {
-    setPrefill({ ...parsed, sourceText: text });
+    setPrefill({ ...parsed, sourceText: text, photo: scan?.image || null });
     navigate('/add');
   }
 
+  const scanning = scan && !scan.done;
   return html`<div class="form">
-    <p class="muted">מדביקים כאן הודעת SMS או מייל של גיפט קארד, זיכוי או קופון, ואנחנו נמלא את הפרטים. בסוף בודקים ומאשרים.</p>
-    <${Field} label="ההודעה" id="paste-text">
-      <textarea id="paste-text" ref=${ref} rows="6" placeholder="למשל: קיבלת גיפט קארד BuyMe בשווי 200 ₪ ..." value=${text} onInput=${(e) => setText(e.currentTarget.value)}></textarea>
-    </${Field}>
-    ${!text && html`<button type="button" class="btn outline block" onClick=${pasteFromClipboard}><${Icon} name="clipboard-paste" />הדבקה מהלוח</button>`}
-    ${text && html`<div class="panel" style=${{ marginBottom: 0 }}>
+    ${!scan && html`<p class="muted">מצלמים קבלה או תעודת זיכוי, מעלים צילום מסך של SMS או מייל, או מדביקים את הטקסט. אנחנו נמלא את הפרטים, ובסוף בודקים ומאשרים.</p>`}
+    ${ocrSupported() && !scanning && html`<button type="button" class=${`btn block ${scan ? 'outline' : 'primary'}`} onClick=${scanImage}>
+      <${Icon} name="camera" />${scan ? 'תמונה אחרת' : 'צילום או צילום מסך'}
+    </button>`}
+    ${scanning && html`<${ScanProgress} ...${scan} />`}
+    ${scan?.done && !scan.error && html`<${Banner} icon="sparkles" title="קראנו את הטקסט מהתמונה">
+      התמונה תישמר בכרטיס. אפשר לתקן את הטקסט למטה אם משהו נקרא לא נכון.
+    </${Banner}>`}
+    ${scan?.error && html`<${Banner} tone="warn" icon="alert">לא הצלחנו לקרוא את התמונה. אפשר להדביק את הטקסט או למלא ידנית.</${Banner}>`}
+    ${!scanning && html`<${Field} label=${scan?.done ? 'הטקסט שזוהה' : 'או הדבקת הטקסט'} id="paste-text">
+      <textarea id="paste-text" ref=${ref} rows=${scan?.done ? 8 : 5} placeholder="למשל: קיבלת גיפט קארד BuyMe בשווי 200 ₪ ..." value=${text} onInput=${(e) => setText(e.currentTarget.value)}></textarea>
+    </${Field}>`}
+    ${!text && !scan && html`<button type="button" class="btn outline block" onClick=${pasteFromClipboard}><${Icon} name="clipboard-paste" />הדבקה מהלוח</button>`}
+    ${text && !scanning && html`<div class="panel" style=${{ marginBottom: 0 }}>
       <h3>${found.length ? 'זיהינו' : 'לא זיהינו פרטים, אפשר להמשיך ולמלא ידנית'}</h3>
       ${found.map((k) => html`<div class="prow"><${Icon} name="check" /><span class="v">${FOUND_LABELS[k](parsed)}</span></div>`)}
     </div>`}
-    <button type="button" class="btn primary block" disabled=${!text.trim()} onClick=${proceed}>המשך למילוי הפרטים<${Icon} name="chevron-left" /></button>
+    ${!scanning && html`<button type="button" class="btn primary block" disabled=${!text.trim() && !scan?.image} onClick=${proceed}>המשך למילוי הפרטים<${Icon} name="chevron-left" /></button>`}
   </div>`;
 }
 
-export function openPasteSheet() {
-  return openSheet('הדבקת הודעה', PasteBody);
+export function openPasteSheet(opts = {}) {
+  return openSheet(opts.startWithScan ? 'סריקת קבלה או הודעה' : 'מילוי מתוך הודעה', PasteBody, opts);
 }
+
+export const openScanSheet = () => openPasteSheet({ startWithScan: true });
 
 // Android share target: the manifest sends shared text to ./?title=&text=&url=
 export function consumeShareTarget() {

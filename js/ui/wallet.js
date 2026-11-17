@@ -6,7 +6,8 @@ import { Icon, StoreAvatar, Money, ExpiryBadge, Empty, Banner, TopBar, MemberAva
 import { filterViews, sortViews, summarize, GROUPS, TYPES, TYPE_ORDER, SORTS, SHARED_OWNER } from '../lib/model.js';
 import { formatMoney } from '../lib/money.js';
 import { isIOS, isStandalone, canPromptInstall, promptInstall } from '../lib/platform.js';
-import { openPasteSheet } from './paste.js';
+import { openPasteSheet, openScanSheet } from './paste.js';
+import { ocrSupported } from '../lib/ocr.js';
 import { SyncPill } from './sync-pill.js';
 
 export function CardItem({ view, members }) {
@@ -123,6 +124,7 @@ export function Wallet() {
 
   const actions = html`
     <${SyncPill} />
+    ${ocrSupported() && html`<button class="icon-btn" aria-label="סריקת קבלה או צילום מסך" onClick=${() => openScanSheet()}><${Icon} name="scan-text" /></button>`}
     <button class="icon-btn" aria-label="הדבקת הודעה עם שובר" onClick=${() => openPasteSheet()}><${Icon} name="clipboard-paste" /></button>`;
 
   return html`<div>
@@ -132,6 +134,7 @@ export function Wallet() {
       ${totalCards === 0 ? html`<${Empty} icon="gift" title="הארנק עוד ריק"
           actions=${html`
             <button class="btn primary block" onClick=${() => navigate('/add')}><${Icon} name="plus" />הוספת כרטיס או זיכוי</button>
+            ${ocrSupported() && html`<button class="btn block" onClick=${() => openScanSheet()}><${Icon} name="scan-text" />סריקת קבלה או צילום מסך</button>`}
             <button class="btn block" onClick=${() => openPasteSheet()}><${Icon} name="clipboard-paste" />הדבקת SMS או מייל של שובר</button>`}>
           כאן יופיעו כרטיסי המתנה, הזיכויים והשוברים שלכם, עם היתרה ותאריך התפוגה של כל אחד.
         </${Empty}>`

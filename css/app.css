@@ -839,7 +839,7 @@ button.prow:active, a.prow:active { background: var(--surface-2); }
 }
 @keyframes pop { from { transform: scale(0.94); opacity: 0; } }
 .dialog h2 { font-size: 19px; font-weight: 800; margin-bottom: 8px; }
-.dialog p { color: var(--muted); margin-bottom: 18px; }
+.dialog p { color: var(--muted); margin-bottom: 18px; white-space: pre-line; }
 
 .toast-host {
   position: fixed;
@@ -913,6 +913,11 @@ button.prow:active, a.prow:active { background: var(--surface-2); }
 .viewer .bar .icon-btn { color: #fff; background: rgb(255 255 255 / 0.12); }
 
 .scanner video { width: 100%; border-radius: 16px; background: #000; aspect-ratio: 3 / 4; object-fit: cover; }
+
+.scan-progress { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 6px 0 4px; }
+.scan-progress img { max-height: 220px; max-width: 100%; border-radius: 12px; box-shadow: var(--shadow); }
+.scan-progress .bar { width: 100%; height: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.scan-progress .bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.3s; }
 
 /* ------------------------------------------------------------------ history */
 

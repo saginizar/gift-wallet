@@ -30,11 +30,13 @@ const TYPES = {
   '.png': 'image/png',
   '.woff2': 'font/woff2',
   '.gs': 'text/plain; charset=utf-8',
+  '.gz': 'application/gzip',
+  '.md': 'text/plain; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
 };
 
 // Only the files GitHub Pages would serve as the app; never .git, .env, tests or scripts.
-const PUBLIC = /^\/(?:index\.html|manifest\.webmanifest|sw\.js|(?:css|js|icons|fonts|backend)\/[\w./-]+)$/;
+const PUBLIC = /^\/(?:index\.html|manifest\.webmanifest|sw\.js|(?:css|js|icons|fonts|backend|ocr)\/[\w./-]+)$/;
 
 let gas = MOCK ? createMockGas() : null;
 

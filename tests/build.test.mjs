@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appAssets, assetsVersion } from '../scripts/stamp-sw.mjs';
+import { appAssets, assetsVersion, onDemandAssets } from '../scripts/stamp-sw.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -24,6 +24,21 @@ test('every relative import points at a precached file', () => {
       assert.ok(assets.has(target), `${target} (imported by ${file}) is not precached`);
     }
   }
+});
+
+test('text recognition files exist and are cached on demand, not at install', () => {
+  const onDemand = new Set(onDemandAssets());
+  const ocr = read('js/lib/ocr.js');
+  const dynamic = [...ocr.matchAll(/import\('(\.[^']+)'\)/g)].map((m) => normalize(join('js/lib', m[1])).split('\\').join('/'));
+  assert.deepEqual(dynamic, ['js/vendor/tesseract/tesseract.esm.min.js']);
+  for (const f of [...dynamic, 'js/vendor/tesseract/worker.min.js', 'ocr/heb.traineddata.gz', 'ocr/eng.traineddata.gz',
+    'ocr/tesseract-core-simd-lstm.wasm.js', 'ocr/tesseract-core-lstm.wasm.js']) {
+    assert.ok(existsSync(join(ROOT, f)), `${f} missing`);
+    assert.ok(onDemand.has(f), `${f} is not in the on-demand cache`);
+  }
+  assert.ok(!appAssets().some((a) => a.startsWith('ocr/') || a.includes('/tesseract/')), 'OCR files must not be precached');
+  assert.match(read('sw.js'), /const OCR_VERSION = 'gw-ocr-[0-9a-f]{12}'/);
+  assert.match(read('index.html'), /'wasm-unsafe-eval'/);
 });
 
 test('no regex lookbehind: Safari before 16.4 fails to parse the module', () => {

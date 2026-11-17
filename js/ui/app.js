@@ -45,7 +45,7 @@ function TabBar({ active }) {
 function Screen({ route }) {
   switch (route.name) {
     case 'card': return html`<${CardDetail} key=${route.params.id} id=${route.params.id} />`;
-    case 'add': return html`<${CardForm} key="add" />`;
+    case 'add': return html`<${CardForm} key=${`add-${route.visit}`} />`;
     case 'edit': return html`<${CardForm} key=${`edit-${route.params.id}`} id=${route.params.id} />`;
     case 'history': return html`<${HistoryScreen} />`;
     case 'settings': return html`<${SettingsScreen} />`;
